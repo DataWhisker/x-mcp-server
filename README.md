@@ -9,32 +9,40 @@ A Model Context Protocol (MCP) server for X (Twitter) integration that provides 
 - Get tweets from your home timeline
 - Create new tweets
 - Reply to tweets
-- Built-in rate limit handling for the Basic API tier
+- Built-in rate limit handling for the free API tier
 - TypeScript implementation with full type safety
 
 ## Prerequisites
 
 - Node.js (v16 or higher)
-- X (Twitter) Developer Account with Basic API access ($100/month)
+- X (Twitter) Developer Account (Free)
 - Claude desktop app
 
 ## X API Access
 
-As of 2024, X (Twitter) requires a paid subscription for API access:
+X (Twitter) provides a free tier for basic API access:
 
-### Basic Tier ($100/month)
-- **Tweet Creation:** 
-  - 100 tweets per user per 24 hours
-  - 1,667 tweets per app per 24 hours
-- **Read Access:** Limited read capabilities
+### Free Tier Features
+- **Post Limits:** 
+  - 500 posts per month at user level
+  - 500 posts per month at app level
+- **Read Limits:**
+  - 100 reads per month
 - **Features:**
-  - Access to essential endpoints
-  - Basic search functionality
-  - Community search feature
-  - "Reposts of me" endpoint
-  - Rate limits reset every 15 minutes
+  - Access to v2 post posting endpoints
+  - Media upload endpoints
+  - Access to Ads API
+  - Limited to 1 app ID
+  - Login with X functionality
+- **Rate Limits:**
+  - Rate-limited access to all endpoints
+  - Limits reset periodically
 
-Note: Free API access is no longer available. The Basic tier is the minimum required for API functionality. For higher volume needs, Pro tier ($5000/month) is available with increased limits.
+Note: For higher volume needs, paid tiers are available:
+- Basic tier ($100/month): 50,000 tweets/month, additional endpoints
+- Pro tier ($5000/month): Higher limits and enterprise features
+
+You can access the free tier at: https://developer.x.com/en/portal/products/free
 
 ## Installation
 
@@ -62,21 +70,22 @@ You need to set up your X (Twitter) API credentials. Follow these detailed steps
    - Sign in with your X (Twitter) account
    - If you don't have a developer account, you'll be prompted to create one
 
-2. Subscribe to the Basic tier ($100/month)
-   - Click on "Products" in the left sidebar
-   - Select the Basic tier subscription
-   - Complete the payment process
+2. Access the Free Tier:
+   - Visit https://developer.x.com/en/portal/products/free
+   - Click "Subscribe" for the Free Access tier
+   - Complete the registration process
 
 3. Create a new project:
-   - Click "Add Project" button
+   - Click "Create Project" button
    - Enter a project name (e.g., "MCP Integration")
-   - Select your use case
+   - Select "Free" as your setup
+   - Choose your use case
    - Click "Next"
 
 4. Create a new app within your project:
-   - Click "Add App"
+   - Click "Create App"
    - Enter an app name
-   - Click "Next"
+   - Click "Complete Setup"
 
 5. Configure app settings:
    - In your app dashboard, click "App Settings"
@@ -96,18 +105,24 @@ You need to set up your X (Twitter) API credentials. Follow these detailed steps
 7. Generate API Keys and Tokens:
    - Go to "Keys and Tokens" tab
    - Under "Consumer Keys":
-     - Click "Regenerate" or "View"
+     - Click "View Keys" or "Regenerate"
      - Save your API Key and API Key Secret
-   - Under "Authentication Tokens":
+   - Under "Access Token and Secret":
      - Click "Generate"
      - Make sure to select tokens with "Read and Write" permissions
      - Save your Access Token and Access Token Secret
 
-Important: Keep your keys and tokens secure and never share them publicly. You'll need all four values:
-- API Key (also called Consumer Key)
-- API Key Secret (also called Consumer Secret)
-- Access Token
-- Access Token Secret
+Important: 
+- Keep your keys and tokens secure and never share them publicly
+- You'll need all four values:
+  - API Key (also called Consumer Key)
+  - API Key Secret (also called Consumer Secret)
+  - Access Token
+  - Access Token Secret
+- Remember the free tier limits:
+  - 500 posts per month at user level
+  - 500 posts per month at app level
+  - 100 reads per month
 
 ## Claude Desktop Configuration
 
@@ -208,13 +223,16 @@ await use_mcp_tool({
 
 ## Rate Limiting
 
-The server includes built-in rate limit handling for X's Basic API tier:
-- Implements 15-minute rate limit windows
-- Limits tweet creation to 100 tweets per user per 24 hours
-- Limits total app tweets to 1,667 per 24 hours
-- Provides exponential backoff for rate limit errors
-- Clear error messages when limits are reached
-- Automatic retry after rate limit window expires
+The server includes built-in rate limit handling for X's free tier:
+- Monthly limits:
+  - 500 posts per month at user level
+  - 500 posts per month at app level
+  - 100 reads per month
+- Features:
+  - Tracks monthly usage
+  - Provides exponential backoff for rate limit errors
+  - Clear error messages when limits are reached
+  - Automatic retry after rate limit window expires
 
 ## License
 
