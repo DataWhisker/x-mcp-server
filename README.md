@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for X (Twitter) integration that provides tools for reading your timeline and engaging with tweets. Designed for use with Claude desktop.
 
+<a href="https://glama.ai/mcp/servers/5nx3qqiunw"><img width="380" height="200" src="https://glama.ai/mcp/servers/5nx3qqiunw/badge" alt="X Server MCP server" /></a>
+
 ## Features
 
 - Get tweets from your home timeline
