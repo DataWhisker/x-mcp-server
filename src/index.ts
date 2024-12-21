@@ -6,6 +6,8 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  Tool,
+  TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { TwitterApi } from 'twitter-api-v2';
 
@@ -59,7 +61,7 @@ class XMcpServer {
     this.server = new Server(
       {
         name: 'x-mcp-server',
-        version: '0.1.0',
+        version: '1.0.0',
       },
       {
         capabilities: {
