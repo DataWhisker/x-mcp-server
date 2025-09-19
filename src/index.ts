@@ -15,11 +15,12 @@ import { TwitterApi } from 'twitter-api-v2';
 const rateLimitResets: { [key: string]: number } = {
   'home': 0,
   'tweet': 0,
-  'reply': 0
+  'reply': 0,
+  'delete': 0
 };
 
 // Helper function for rate limit handling
-async function withRateLimit<T>(endpoint: 'home' | 'tweet' | 'reply', fn: () => Promise<T>): Promise<T> {
+async function withRateLimit<T>(endpoint: 'home' | 'tweet' | 'reply' | 'delete', fn: () => Promise<T>): Promise<T> {
   const now = Date.now();
   const resetTime = rateLimitResets[endpoint];
   
@@ -133,6 +134,20 @@ class XMcpServer {
             required: ['tweet_id', 'text'],
           },
         },
+        {
+          name: 'delete_tweet',
+          description: 'Delete one of your tweets',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              tweet_id: {
+                type: 'string',
+                description: 'The ID of the tweet to delete',
+              },
+            },
+            required: ['tweet_id'],
+          },
+        },
       ],
     }));
 
@@ -184,6 +199,20 @@ class XMcpServer {
                 {
                   type: 'text',
                   text: JSON.stringify(reply.data, null, 2),
+                },
+              ],
+            };
+          }
+
+          case 'delete_tweet': {
+            const { tweet_id } = request.params.arguments as { tweet_id: string };
+            const deleted = await withRateLimit('delete', () => client.v2.deleteTweet(tweet_id));
+            
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(deleted.data, null, 2),
                 },
               ],
             };
