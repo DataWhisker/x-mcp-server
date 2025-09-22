@@ -9,6 +9,7 @@ A Model Context Protocol (MCP) server for X (Twitter) integration that provides 
 - Get tweets from your home timeline
 - Create new tweets
 - Reply to tweets
+- Delete tweets
 - Built-in rate limit handling for the free API tier
 - TypeScript implementation with full type safety
 
@@ -211,6 +212,21 @@ await use_mcp_tool({
   arguments: {
     tweet_id: "1234567890",
     text: "Great tweet! 👍"
+  }
+});
+```
+
+### delete_tweet
+Delete a tweet.
+Parameters:
+- `tweet_id` (required): The ID of the tweet to delete
+Example:
+```typescript
+await use_mcp_tool({
+  server_name: "x",
+  tool_name: "delete_tweet",
+  arguments: {
+    tweet_id: "1234567890"
   }
 });
 ```
