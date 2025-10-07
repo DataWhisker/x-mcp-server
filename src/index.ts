@@ -10,14 +10,35 @@ import {
   TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { TwitterApi } from 'twitter-api-v2';
-import { readFile } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
+import { resolve, basename } from 'path';
 
-// Helper function to upload media
-async function uploadImage(imagePath: string): Promise<string> {
-  const imageBuffer = await readFile(imagePath);
+// Helper function to upload media with validation
+async function uploadImage(client: TwitterApi, imagePath: string): Promise<string> {
+  // Sanitize path to prevent directory traversal
+  const sanitizedPath = resolve(imagePath);
+
+  // Validate file exists and get stats
+  let fileStats;
+  try {
+    fileStats = await stat(sanitizedPath);
+  } catch (error) {
+    throw new Error(`File not found: ${basename(sanitizedPath)}`);
+  }
+
+  // Check if it's a file (not a directory)
+  if (!fileStats.isFile()) {
+    throw new Error(`Path is not a file: ${basename(sanitizedPath)}`);
+  }
+
+  // Twitter image size limit is 5MB
+  const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+  if (fileStats.size > MAX_SIZE) {
+    throw new Error(`File size exceeds 5MB limit (${(fileStats.size / 1024 / 1024).toFixed(2)}MB)`);
+  }
 
   // Detect mime type from file extension
-  const ext = imagePath.toLowerCase().split('.').pop();
+  const ext = sanitizedPath.toLowerCase().split('.').pop();
   const mimeTypes: { [key: string]: string } = {
     'png': 'image/png',
     'jpg': 'image/jpeg',
@@ -25,8 +46,17 @@ async function uploadImage(imagePath: string): Promise<string> {
     'gif': 'image/gif',
     'webp': 'image/webp'
   };
-  const mimeType = mimeTypes[ext || ''] || 'image/png';
 
+  // Validate supported format
+  if (!ext || !mimeTypes[ext]) {
+    const supported = Object.keys(mimeTypes).join(', ');
+    throw new Error(`Unsupported file format. Supported formats: ${supported}`);
+  }
+
+  const mimeType = mimeTypes[ext];
+
+  // Read and upload file
+  const imageBuffer = await readFile(sanitizedPath);
   return await client.v1.uploadMedia(imageBuffer, { mimeType });
 }
 
@@ -211,7 +241,7 @@ class XMcpServer {
             // Upload media if image_path is provided
             if (image_path) {
               try {
-                mediaId = await uploadImage(image_path);
+                mediaId = await uploadImage(client, image_path);
               } catch (error) {
                 throw new McpError(
                   ErrorCode.InvalidRequest,
@@ -248,7 +278,7 @@ class XMcpServer {
             // Upload media if image_path is provided
             if (image_path) {
               try {
-                mediaId = await uploadImage(image_path);
+                mediaId = await uploadImage(client, image_path);
               } catch (error) {
                 throw new McpError(
                   ErrorCode.InvalidRequest,
