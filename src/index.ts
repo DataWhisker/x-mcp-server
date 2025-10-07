@@ -22,7 +22,8 @@ async function uploadImage(imagePath: string): Promise<string> {
     'png': 'image/png',
     'jpg': 'image/jpeg',
     'jpeg': 'image/jpeg',
-    'gif': 'image/gif'
+    'gif': 'image/gif',
+    'webp': 'image/webp'
   };
   const mimeType = mimeTypes[ext || ''] || 'image/png';
 
@@ -131,7 +132,7 @@ class XMcpServer {
               },
               image_path: {
                 type: 'string',
-                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF)',
+                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF, WEBP)',
               },
             },
             required: ['text'],
@@ -154,7 +155,7 @@ class XMcpServer {
               },
               image_path: {
                 type: 'string',
-                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF)',
+                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF, WEBP)',
               },
             },
             required: ['tweet_id', 'text'],
