@@ -7,9 +7,11 @@ A Model Context Protocol (MCP) server for X (Twitter) integration that provides 
 ## Features
 
 - Get tweets from your home timeline
-- Create new tweets
-- Reply to tweets
+- Create new tweets with optional image attachments
+- Reply to tweets with optional image attachments
 - Delete tweets
+- Image upload support (PNG, JPEG, GIF, WEBP)
+- Built-in security validation and file size limits
 - Built-in rate limit handling for the free API tier
 - TypeScript implementation with full type safety
 
@@ -183,12 +185,13 @@ await use_mcp_tool({
 ```
 
 ### create_tweet
-Create a new tweet.
+Create a new tweet with optional image attachment.
 
 Parameters:
 - `text` (required): The text content of the tweet (max 280 characters)
+- `image_path` (optional): Absolute path to an image file (PNG, JPEG, GIF, WEBP, max 5MB)
 
-Example:
+Example (text-only):
 ```typescript
 await use_mcp_tool({
   server_name: "x",
@@ -197,14 +200,27 @@ await use_mcp_tool({
 });
 ```
 
+Example (with image):
+```typescript
+await use_mcp_tool({
+  server_name: "x",
+  tool_name: "create_tweet",
+  arguments: {
+    text: "Check out this image! 📸",
+    image_path: "/path/to/image.png"
+  }
+});
+```
+
 ### reply_to_tweet
-Reply to a tweet.
+Reply to a tweet with optional image attachment.
 
 Parameters:
 - `tweet_id` (required): The ID of the tweet to reply to
 - `text` (required): The text content of the reply (max 280 characters)
+- `image_path` (optional): Absolute path to an image file (PNG, JPEG, GIF, WEBP, max 5MB)
 
-Example:
+Example (text-only):
 ```typescript
 await use_mcp_tool({
   server_name: "x",
@@ -212,6 +228,19 @@ await use_mcp_tool({
   arguments: {
     tweet_id: "1234567890",
     text: "Great tweet! 👍"
+  }
+});
+```
+
+Example (with image):
+```typescript
+await use_mcp_tool({
+  server_name: "x",
+  tool_name: "reply_to_tweet",
+  arguments: {
+    tweet_id: "1234567890",
+    text: "Here's my response 📸",
+    image_path: "/path/to/image.jpg"
   }
 });
 ```
