@@ -10,6 +10,55 @@ import {
   TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { TwitterApi } from 'twitter-api-v2';
+import { readFile, stat } from 'fs/promises';
+import { resolve, basename } from 'path';
+
+// Helper function to upload media with validation
+async function uploadImage(client: TwitterApi, imagePath: string): Promise<string> {
+  // Sanitize path to prevent directory traversal
+  const sanitizedPath = resolve(imagePath);
+
+  // Validate file exists and get stats
+  let fileStats;
+  try {
+    fileStats = await stat(sanitizedPath);
+  } catch (error) {
+    throw new Error(`File not found: ${basename(sanitizedPath)}`);
+  }
+
+  // Check if it's a file (not a directory)
+  if (!fileStats.isFile()) {
+    throw new Error(`Path is not a file: ${basename(sanitizedPath)}`);
+  }
+
+  // Twitter image size limit is 5MB
+  const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+  if (fileStats.size > MAX_SIZE) {
+    throw new Error(`File size exceeds 5MB limit (${(fileStats.size / 1024 / 1024).toFixed(2)}MB)`);
+  }
+
+  // Detect mime type from file extension
+  const ext = sanitizedPath.toLowerCase().split('.').pop();
+  const mimeTypes: { [key: string]: string } = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'webp': 'image/webp'
+  };
+
+  // Validate supported format
+  if (!ext || !mimeTypes[ext]) {
+    const supported = Object.keys(mimeTypes).join(', ');
+    throw new Error(`Unsupported file format. Supported formats: ${supported}`);
+  }
+
+  const mimeType = mimeTypes[ext];
+
+  // Read and upload file
+  const imageBuffer = await readFile(sanitizedPath);
+  return await client.v1.uploadMedia(imageBuffer, { mimeType });
+}
 
 // Track rate limit reset times
 const rateLimitResets: { [key: string]: number } = {
@@ -102,7 +151,7 @@ class XMcpServer {
         },
         {
           name: 'create_tweet',
-          description: 'Create a new tweet',
+          description: 'Create a new tweet with optional image attachment',
           inputSchema: {
             type: 'object',
             properties: {
@@ -111,13 +160,17 @@ class XMcpServer {
                 description: 'The text content of the tweet',
                 maxLength: 280,
               },
+              image_path: {
+                type: 'string',
+                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF, WEBP)',
+              },
             },
             required: ['text'],
           },
         },
         {
           name: 'reply_to_tweet',
-          description: 'Reply to a tweet',
+          description: 'Reply to a tweet with optional image attachment',
           inputSchema: {
             type: 'object',
             properties: {
@@ -129,6 +182,10 @@ class XMcpServer {
                 type: 'string',
                 description: 'The text content of the reply',
                 maxLength: 280,
+              },
+              image_path: {
+                type: 'string',
+                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF, WEBP)',
               },
             },
             required: ['tweet_id', 'text'],
@@ -174,9 +231,31 @@ class XMcpServer {
           }
 
           case 'create_tweet': {
-            const { text } = request.params.arguments as { text: string };
-            const tweet = await withRateLimit('tweet', () => client.v2.tweet(text));
-            
+            const { text, image_path } = request.params.arguments as {
+              text: string;
+              image_path?: string;
+            };
+
+            let mediaId: string | undefined;
+
+            // Upload media if image_path is provided
+            if (image_path) {
+              try {
+                mediaId = await uploadImage(client, image_path);
+              } catch (error) {
+                throw new McpError(
+                  ErrorCode.InvalidRequest,
+                  `Failed to upload image: ${(error as Error).message}`
+                );
+              }
+            }
+
+            const tweet = await withRateLimit('tweet', () =>
+              mediaId
+                ? client.v2.tweet({ text, media: { media_ids: [mediaId] } })
+                : client.v2.tweet(text)
+            );
+
             return {
               content: [
                 {
@@ -188,12 +267,32 @@ class XMcpServer {
           }
 
           case 'reply_to_tweet': {
-            const { tweet_id, text } = request.params.arguments as {
+            const { tweet_id, text, image_path } = request.params.arguments as {
               tweet_id: string;
               text: string;
+              image_path?: string;
             };
-            const reply = await withRateLimit('reply', () => client.v2.reply(text, tweet_id));
-            
+
+            let mediaId: string | undefined;
+
+            // Upload media if image_path is provided
+            if (image_path) {
+              try {
+                mediaId = await uploadImage(client, image_path);
+              } catch (error) {
+                throw new McpError(
+                  ErrorCode.InvalidRequest,
+                  `Failed to upload image: ${(error as Error).message}`
+                );
+              }
+            }
+
+            const reply = await withRateLimit('reply', () =>
+              mediaId
+                ? client.v2.tweet({ text, reply: { in_reply_to_tweet_id: tweet_id }, media: { media_ids: [mediaId] } })
+                : client.v2.reply(text, tweet_id)
+            );
+
             return {
               content: [
                 {
