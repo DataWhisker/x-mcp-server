@@ -10,7 +10,24 @@ import {
   TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { TwitterApi } from 'twitter-api-v2';
-import { readFileSync } from 'fs';
+import { readFile } from 'fs/promises';
+
+// Helper function to upload media
+async function uploadImage(imagePath: string): Promise<string> {
+  const imageBuffer = await readFile(imagePath);
+
+  // Detect mime type from file extension
+  const ext = imagePath.toLowerCase().split('.').pop();
+  const mimeTypes: { [key: string]: string } = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif'
+  };
+  const mimeType = mimeTypes[ext || ''] || 'image/png';
+
+  return await client.v1.uploadMedia(imageBuffer, { mimeType });
+}
 
 // Track rate limit reset times
 const rateLimitResets: { [key: string]: number } = {
@@ -193,9 +210,7 @@ class XMcpServer {
             // Upload media if image_path is provided
             if (image_path) {
               try {
-                const imageBuffer = readFileSync(image_path);
-                const mediaUpload = await client.v1.uploadMedia(imageBuffer, { mimeType: 'image/png' });
-                mediaId = mediaUpload;
+                mediaId = await uploadImage(image_path);
               } catch (error) {
                 throw new McpError(
                   ErrorCode.InvalidRequest,
@@ -232,9 +247,7 @@ class XMcpServer {
             // Upload media if image_path is provided
             if (image_path) {
               try {
-                const imageBuffer = readFileSync(image_path);
-                const mediaUpload = await client.v1.uploadMedia(imageBuffer, { mimeType: 'image/png' });
-                mediaId = mediaUpload;
+                mediaId = await uploadImage(image_path);
               } catch (error) {
                 throw new McpError(
                   ErrorCode.InvalidRequest,
