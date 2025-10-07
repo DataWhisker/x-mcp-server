@@ -10,6 +10,7 @@ import {
   TextContent
 } from '@modelcontextprotocol/sdk/types.js';
 import { TwitterApi } from 'twitter-api-v2';
+import { readFileSync } from 'fs';
 
 // Track rate limit reset times
 const rateLimitResets: { [key: string]: number } = {
@@ -102,7 +103,7 @@ class XMcpServer {
         },
         {
           name: 'create_tweet',
-          description: 'Create a new tweet',
+          description: 'Create a new tweet with optional image attachment',
           inputSchema: {
             type: 'object',
             properties: {
@@ -111,13 +112,17 @@ class XMcpServer {
                 description: 'The text content of the tweet',
                 maxLength: 280,
               },
+              image_path: {
+                type: 'string',
+                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF)',
+              },
             },
             required: ['text'],
           },
         },
         {
           name: 'reply_to_tweet',
-          description: 'Reply to a tweet',
+          description: 'Reply to a tweet with optional image attachment',
           inputSchema: {
             type: 'object',
             properties: {
@@ -129,6 +134,10 @@ class XMcpServer {
                 type: 'string',
                 description: 'The text content of the reply',
                 maxLength: 280,
+              },
+              image_path: {
+                type: 'string',
+                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF)',
               },
             },
             required: ['tweet_id', 'text'],
@@ -174,9 +183,33 @@ class XMcpServer {
           }
 
           case 'create_tweet': {
-            const { text } = request.params.arguments as { text: string };
-            const tweet = await withRateLimit('tweet', () => client.v2.tweet(text));
-            
+            const { text, image_path } = request.params.arguments as {
+              text: string;
+              image_path?: string;
+            };
+
+            let mediaId: string | undefined;
+
+            // Upload media if image_path is provided
+            if (image_path) {
+              try {
+                const imageBuffer = readFileSync(image_path);
+                const mediaUpload = await client.v1.uploadMedia(imageBuffer, { mimeType: 'image/png' });
+                mediaId = mediaUpload;
+              } catch (error) {
+                throw new McpError(
+                  ErrorCode.InvalidRequest,
+                  `Failed to upload image: ${(error as Error).message}`
+                );
+              }
+            }
+
+            const tweet = await withRateLimit('tweet', () =>
+              mediaId
+                ? client.v2.tweet({ text, media: { media_ids: [mediaId] } })
+                : client.v2.tweet(text)
+            );
+
             return {
               content: [
                 {
@@ -188,12 +221,34 @@ class XMcpServer {
           }
 
           case 'reply_to_tweet': {
-            const { tweet_id, text } = request.params.arguments as {
+            const { tweet_id, text, image_path } = request.params.arguments as {
               tweet_id: string;
               text: string;
+              image_path?: string;
             };
-            const reply = await withRateLimit('reply', () => client.v2.reply(text, tweet_id));
-            
+
+            let mediaId: string | undefined;
+
+            // Upload media if image_path is provided
+            if (image_path) {
+              try {
+                const imageBuffer = readFileSync(image_path);
+                const mediaUpload = await client.v1.uploadMedia(imageBuffer, { mimeType: 'image/png' });
+                mediaId = mediaUpload;
+              } catch (error) {
+                throw new McpError(
+                  ErrorCode.InvalidRequest,
+                  `Failed to upload image: ${(error as Error).message}`
+                );
+              }
+            }
+
+            const reply = await withRateLimit('reply', () =>
+              mediaId
+                ? client.v2.tweet({ text, reply: { in_reply_to_tweet_id: tweet_id }, media: { media_ids: [mediaId] } })
+                : client.v2.reply(text, tweet_id)
+            );
+
             return {
               content: [
                 {
