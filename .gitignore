@@ -10,6 +10,7 @@ dist/
 .env
 *.env
 .env.*
+.x-mcp-tokens.json
 
 # IDE specific files
 .vscode/

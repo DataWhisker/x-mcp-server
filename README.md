@@ -1,283 +1,190 @@
 # X MCP Server
 
-A Model Context Protocol (MCP) server for X (Twitter) integration that provides tools for reading your timeline and engaging with tweets. Designed for use with Claude desktop.
+A Model Context Protocol (MCP) server for X (Twitter) integration. Provides 16 tools for reading timelines, posting, searching, engagement (likes, retweets, bookmarks), and user lookup. Designed for use with Claude desktop and other MCP-compatible clients.
 
 <a href="https://glama.ai/mcp/servers/5nx3qqiunw"><img width="380" height="200" src="https://glama.ai/mcp/servers/5nx3qqiunw/badge" alt="X Server MCP server" /></a>
 
 ## Features
 
-- Get tweets from your home timeline
-- Create new tweets with optional image attachments
-- Reply to tweets with optional image attachments
-- Delete tweets
-- Image upload support (PNG, JPEG, GIF, WEBP)
-- Built-in security validation and file size limits
-- Built-in rate limit handling for the free API tier
-- TypeScript implementation with full type safety
+- **Timeline & Search** — Home timeline, search recent posts (7-day window)
+- **Post Management** — Create, reply, quote, delete posts with optional media
+- **Engagement** — Like/unlike, retweet/undo, bookmark/unbookmark
+- **User Lookup** — Get user profiles and their recent posts
+- **Media Upload** — Images (PNG, JPEG, GIF, WEBP) and videos (MP4, MOV, AVI, WEBM, M4V) via v2 upload API
+- **Dual Auth** — OAuth 1.0a for post operations, OAuth 2.0 for media upload (v1.1 upload was sunset June 2025)
+- **Rate Limiting** — Automatic per-endpoint rate limit tracking with clear error messages
+- **TypeScript** — Full type safety, modular file structure
 
 ## Prerequisites
 
-- Node.js (v16 or higher)
-- X (Twitter) Developer Account (Free)
-- Claude desktop app
+- Node.js >= 18.0.0
+- X (Twitter) Developer Account
+- Claude desktop app (or any MCP-compatible client)
 
-## X API Access
+## X API Access & Pricing
 
-X (Twitter) provides a free tier for basic API access:
+| Tier | Cost | Post Reads | Post Writes | Notes |
+|------|------|-----------|-------------|-------|
+| **Free** | $0 | ~100/month | ~500/month | No likes/follows; media upload requires OAuth 2.0 |
+| **Basic** | $200/month | 10,000/month | 3,000/month | Search, limited read access |
+| **Pro** | $5,000/month | 1,000,000/month | 300,000/month | Full search, filtered stream |
+| **Pay-Per-Use** | Credit-based | ~$0.005/read | Varies | Launched Feb 2026, 2M reads cap |
 
-### Free Tier Features
-- **Post Limits:** 
-  - 500 posts per month at user level
-  - 500 posts per month at app level
-- **Read Limits:**
-  - 100 reads per month
-- **Features:**
-  - Access to v2 post posting endpoints
-  - Media upload endpoints
-  - Access to Ads API
-  - Limited to 1 app ID
-  - Login with X functionality
-- **Rate Limits:**
-  - Rate-limited access to all endpoints
-  - Limits reset periodically
-
-Note: For higher volume needs, paid tiers are available:
-- Basic tier ($100/month): 50,000 tweets/month, additional endpoints
-- Pro tier ($5000/month): Higher limits and enterprise features
-
-You can access the free tier at: https://developer.x.com/en/portal/products/free
+> Like and Follow endpoints were removed from the Free tier in August 2025.
+> Follows/Blocks endpoints are Enterprise-only as of 2025.
 
 ## Installation
 
-1. Clone the repository:
 ```bash
-git clone [your-repo-url]
+git clone https://github.com/DataWhisker/x-mcp-server.git
 cd x-mcp-server
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Build the server:
-```bash
 npm run build
 ```
 
-## Configuration
+## Authentication
 
-You need to set up your X (Twitter) API credentials. Follow these detailed steps:
+The server supports two authentication methods. You need **at least one** configured.
 
-1. Go to the [Twitter Developer Portal](https://developer.twitter.com/en/portal/dashboard)
-   - Sign in with your X (Twitter) account
-   - If you don't have a developer account, you'll be prompted to create one
+### OAuth 1.0a (Required for basic operations)
 
-2. Access the Free Tier:
-   - Visit https://developer.x.com/en/portal/products/free
-   - Click "Subscribe" for the Free Access tier
-   - Complete the registration process
+Works for all post/engagement/search/user operations.
 
-3. Create a new project:
-   - Click "Create Project" button
-   - Enter a project name (e.g., "MCP Integration")
-   - Select "Free" as your setup
-   - Choose your use case
-   - Click "Next"
+| Environment Variable | Description |
+|---------------------|-------------|
+| `TWITTER_API_KEY` | Consumer Key (API Key) |
+| `TWITTER_API_SECRET` | Consumer Secret (API Key Secret) |
+| `TWITTER_ACCESS_TOKEN` | User Access Token |
+| `TWITTER_ACCESS_SECRET` | User Access Token Secret |
 
-4. Create a new app within your project:
-   - Click "Create App"
-   - Enter an app name
-   - Click "Complete Setup"
+**Setup:** In the [X Developer Portal](https://developer.x.com/en/portal/dashboard):
+1. Create a project and app
+2. Enable OAuth 1.0a under "User authentication settings"
+3. Set permissions to "Read and Write"
+4. Generate Consumer Keys and Access Tokens
 
-5. Configure app settings:
-   - In your app dashboard, click "App Settings"
-   - Under "User authentication settings":
-     - Click "Set Up"
-     - Enable OAuth 1.0a
-     - Select "Web App" or "Native App"
-     - Enter any URL for callback (e.g., https://example.com/callback)
-     - Enter any URL for website (e.g., https://example.com)
-     - Click "Save"
+### OAuth 2.0 (Required for media upload)
 
-6. Set app permissions:
-   - In app settings, find "App permissions"
-   - Change to "Read and Write"
-   - Click "Save"
+The v1.1 media upload endpoint was sunset in June 2025. Media upload now requires OAuth 2.0 via the v2 upload API.
 
-7. Generate API Keys and Tokens:
-   - Go to "Keys and Tokens" tab
-   - Under "Consumer Keys":
-     - Click "View Keys" or "Regenerate"
-     - Save your API Key and API Key Secret
-   - Under "Access Token and Secret":
-     - Click "Generate"
-     - Make sure to select tokens with "Read and Write" permissions
-     - Save your Access Token and Access Token Secret
+**Option A — Direct access token:**
 
-Important: 
-- Keep your keys and tokens secure and never share them publicly
-- You'll need all four values:
-  - API Key (also called Consumer Key)
-  - API Key Secret (also called Consumer Secret)
-  - Access Token
-  - Access Token Secret
-- Remember the free tier limits:
-  - 500 posts per month at user level
-  - 500 posts per month at app level
-  - 100 reads per month
+| Variable | Description |
+|----------|-------------|
+| `TWITTER_OAUTH2_ACCESS_TOKEN` | OAuth 2.0 user access token (expires in 2 hours) |
+
+**Option B — Auto-refresh (recommended for long-running servers):**
+
+| Variable | Description |
+|----------|-------------|
+| `TWITTER_CLIENT_ID` | OAuth 2.0 Client ID |
+| `TWITTER_CLIENT_SECRET` | OAuth 2.0 Client Secret (optional for public clients) |
+| `TWITTER_OAUTH2_REFRESH_TOKEN` | OAuth 2.0 Refresh Token |
+
+Tokens are auto-refreshed and persisted to `~/.x-mcp-tokens.json`.
+
+**Setup:** In the [X Developer Portal](https://developer.x.com/en/portal/dashboard):
+1. In your app settings, enable OAuth 2.0
+2. Set type to "Confidential client" or "Public client"
+3. Add a callback URL
+4. Request scopes: `tweet.read`, `tweet.write`, `users.read`, `media.write`, `offline.access`, `like.read`, `like.write`, `bookmark.read`, `bookmark.write`
 
 ## Claude Desktop Configuration
 
-To connect the X MCP server with Claude desktop, you need to configure it in the Claude settings. Follow these steps:
+Add to `%APPDATA%/Claude/claude_desktop_config.json`:
 
-1. Open File Explorer
-2. Navigate to the Claude config directory:
-   - Press Win + R
-   - Type `%APPDATA%/Claude` and press Enter
-   - If the Claude folder doesn't exist, create it
-
-3. Create or edit `claude_desktop_config.json`:
-   - If the file doesn't exist, create a new file named `claude_desktop_config.json`
-   - If it exists, open it in a text editor (like Notepad)
-
-4. Add the following configuration, replacing the placeholder values with your actual API credentials from the previous section:
 ```json
 {
   "mcpServers": {
     "x": {
       "command": "node",
-      "args": ["%USERPROFILE%/Projects/MCP Basket/x-server/build/index.js"],
+      "args": ["C:/path/to/x-mcp-server/build/index.js"],
       "env": {
-        "TWITTER_API_KEY": "paste-your-api-key-here",
-        "TWITTER_API_SECRET": "paste-your-api-key-secret-here",
-        "TWITTER_ACCESS_TOKEN": "paste-your-access-token-here",
-        "TWITTER_ACCESS_SECRET": "paste-your-access-token-secret-here"
+        "TWITTER_API_KEY": "your-api-key",
+        "TWITTER_API_SECRET": "your-api-secret",
+        "TWITTER_ACCESS_TOKEN": "your-access-token",
+        "TWITTER_ACCESS_SECRET": "your-access-secret",
+        "TWITTER_OAUTH2_ACCESS_TOKEN": "your-oauth2-token"
       }
     }
   }
 }
 ```
 
-5. Save the file and restart Claude desktop
+## Available Tools (16)
 
-Note: Make sure to:
-- Replace all four credential values with your actual API keys and tokens
-- Keep the quotes ("") around each value
-- Maintain the exact spacing and formatting shown above
-- Save the file with the `.json` extension
+### Timeline & Search
 
-## Available Tools
+| Tool | Description | Key Parameters |
+|------|-------------|---------------|
+| `get_home_timeline` | Get recent posts from home timeline | `limit` (1-100) |
+| `search_tweets` | Search recent posts (7-day window) | `query`, `limit` |
 
-### get_home_timeline
-Get the most recent tweets from your home timeline.
+### Post Management
 
-Parameters:
-- `limit` (optional): Number of tweets to retrieve (default: 20, max: 100)
+| Tool | Description | Key Parameters |
+|------|-------------|---------------|
+| `get_tweet` | Look up a post by ID | `tweet_id` |
+| `create_tweet` | Create a post with optional media | `text`, `image_path?`, `video_path?` |
+| `reply_to_tweet` | Reply to a post with optional media | `tweet_id`, `text`, `image_path?`, `video_path?` |
+| `quote_tweet` | Quote a post with commentary | `tweet_id`, `text` |
+| `delete_tweet` | Delete your post | `tweet_id` |
 
-Example:
-```typescript
-await use_mcp_tool({
-  server_name: "x",
-  tool_name: "get_home_timeline",
-  arguments: { limit: 5 }
-});
-```
+### Engagement
 
-### create_tweet
-Create a new tweet with optional image attachment.
+| Tool | Description | Key Parameters |
+|------|-------------|---------------|
+| `like_tweet` | Like a post (Basic+ tier) | `tweet_id` |
+| `unlike_tweet` | Remove a like | `tweet_id` |
+| `retweet` | Repost to your timeline | `tweet_id` |
+| `undo_retweet` | Remove a repost | `tweet_id` |
+| `bookmark_tweet` | Bookmark for later | `tweet_id` |
+| `unbookmark_tweet` | Remove a bookmark | `tweet_id` |
+| `get_bookmarks` | Get your bookmarks | `limit` (1-100) |
 
-Parameters:
-- `text` (required): The text content of the tweet (max 280 characters)
-- `image_path` (optional): Absolute path to an image file (PNG, JPEG, GIF, WEBP, max 5MB)
+### Users
 
-Example (text-only):
-```typescript
-await use_mcp_tool({
-  server_name: "x",
-  tool_name: "create_tweet",
-  arguments: { text: "Hello from MCP! 🤖" }
-});
-```
+| Tool | Description | Key Parameters |
+|------|-------------|---------------|
+| `get_user` | Look up user by username | `username` |
+| `get_user_tweets` | Get a user's recent posts | `username`, `limit` |
 
-Example (with image):
-```typescript
-await use_mcp_tool({
-  server_name: "x",
-  tool_name: "create_tweet",
-  arguments: {
-    text: "Check out this image! 📸",
-    image_path: "/path/to/image.png"
-  }
-});
-```
+## Media Support
 
-### reply_to_tweet
-Reply to a tweet with optional image attachment.
+- **Images:** PNG, JPEG, GIF, WEBP (max 5MB)
+- **Videos:** MP4, MOV, AVI, WEBM, M4V (max 512MB, streamed chunked upload)
+- Cannot attach both image and video to the same post
+- Requires OAuth 2.0 credentials (v1.1 upload sunset June 2025)
+- **Path restriction:** Only files within your home directory or system temp directory can be uploaded (prevents path traversal)
 
-Parameters:
-- `tweet_id` (required): The ID of the tweet to reply to
-- `text` (required): The text content of the reply (max 280 characters)
-- `image_path` (optional): Absolute path to an image file (PNG, JPEG, GIF, WEBP, max 5MB)
+## Security
 
-Example (text-only):
-```typescript
-await use_mcp_tool({
-  server_name: "x",
-  tool_name: "reply_to_tweet",
-  arguments: {
-    tweet_id: "1234567890",
-    text: "Great tweet! 👍"
-  }
-});
-```
-
-Example (with image):
-```typescript
-await use_mcp_tool({
-  server_name: "x",
-  tool_name: "reply_to_tweet",
-  arguments: {
-    tweet_id: "1234567890",
-    text: "Here's my response 📸",
-    image_path: "/path/to/image.jpg"
-  }
-});
-```
-
-### delete_tweet
-Delete a tweet.
-Parameters:
-- `tweet_id` (required): The ID of the tweet to delete
-Example:
-```typescript
-await use_mcp_tool({
-  server_name: "x",
-  tool_name: "delete_tweet",
-  arguments: {
-    tweet_id: "1234567890"
-  }
-});
-```
+- **Input validation:** Tweet IDs must be numeric (1-20 digits), usernames must match `[A-Za-z0-9_]{1,15}`
+- **Media path restriction:** Upload paths are validated against an allow-list (home directory, temp directory)
+- **Token storage:** OAuth 2.0 tokens persisted to `~/.x-mcp-tokens.json` with `0o600` permissions (Unix). On Windows, file permissions are not enforced by the OS — protect the file via NTFS ACLs or use environment variables instead.
+- **Error sanitization:** X API error details are logged server-side only; sanitized messages are returned to MCP clients
+- **Refresh mutex:** Concurrent token refresh attempts are deduplicated to prevent race conditions
 
 ## Development
 
-- `npm run build`: Build the TypeScript code
-- `npm run dev`: Run TypeScript in watch mode
-- `npm start`: Start the MCP server
+```bash
+npm run build    # Compile TypeScript
+npm run dev      # Watch mode
+npm start        # Run the server
+```
 
-## Rate Limiting
+## Project Structure
 
-The server includes built-in rate limit handling for X's free tier:
-- Monthly limits:
-  - 500 posts per month at user level
-  - 500 posts per month at app level
-  - 100 reads per month
-- Features:
-  - Tracks monthly usage
-  - Provides exponential backoff for rate limit errors
-  - Clear error messages when limits are reached
-  - Automatic retry after rate limit window expires
+```
+src/
+  index.ts              # MCP server entry point & handler dispatch
+  client.ts             # Twitter client setup (OAuth 1.0a + OAuth 2.0)
+  media.ts              # v2 media upload (simple + chunked)
+  rate-limit.ts         # Per-endpoint rate limiting
+  tools/
+    definitions.ts      # All 16 tool schemas
+    handlers.ts         # Tool handler implementations
+```
 
 ## License
 

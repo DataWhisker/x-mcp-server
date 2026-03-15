@@ -6,177 +6,60 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
-  Tool,
-  TextContent
 } from '@modelcontextprotocol/sdk/types.js';
-import { TwitterApi } from 'twitter-api-v2';
-import { readFile, stat } from 'fs/promises';
-import { resolve, basename } from 'path';
+import { TOOL_DEFINITIONS } from './tools/definitions.js';
+import {
+  handleGetHomeTimeline,
+  handleSearchTweets,
+  handleGetTweet,
+  handleCreateTweet,
+  handleReplyToTweet,
+  handleQuoteTweet,
+  handleDeleteTweet,
+  handleLikeTweet,
+  handleUnlikeTweet,
+  handleRetweet,
+  handleUndoRetweet,
+  handleBookmarkTweet,
+  handleUnbookmarkTweet,
+  handleGetBookmarks,
+  handleGetUser,
+  handleGetUserTweets,
+} from './tools/handlers.js';
 
-// Helper function to upload media with validation
-async function uploadImage(client: TwitterApi, imagePath: string): Promise<string> {
-  // Sanitize path to prevent directory traversal
-  const sanitizedPath = resolve(imagePath);
+type ToolHandler = (args: Record<string, unknown>) => Promise<{
+  readonly content: ReadonlyArray<{ readonly type: 'text'; readonly text: string }>;
+}>;
 
-  // Validate file exists and get stats
-  let fileStats;
-  try {
-    fileStats = await stat(sanitizedPath);
-  } catch (error) {
-    throw new Error(`File not found: ${basename(sanitizedPath)}`);
-  }
-
-  // Check if it's a file (not a directory)
-  if (!fileStats.isFile()) {
-    throw new Error(`Path is not a file: ${basename(sanitizedPath)}`);
-  }
-
-  // Twitter image size limit is 5MB
-  const MAX_SIZE = 5 * 1024 * 1024; // 5MB in bytes
-  if (fileStats.size > MAX_SIZE) {
-    throw new Error(`File size exceeds 5MB limit (${(fileStats.size / 1024 / 1024).toFixed(2)}MB)`);
-  }
-
-  // Detect mime type from file extension
-  const ext = sanitizedPath.toLowerCase().split('.').pop();
-  const mimeTypes: { [key: string]: string } = {
-    'png': 'image/png',
-    'jpg': 'image/jpeg',
-    'jpeg': 'image/jpeg',
-    'gif': 'image/gif',
-    'webp': 'image/webp'
-  };
-
-  // Validate supported format
-  if (!ext || !mimeTypes[ext]) {
-    const supported = Object.keys(mimeTypes).join(', ');
-    throw new Error(`Unsupported file format. Supported formats: ${supported}`);
-  }
-
-  const mimeType = mimeTypes[ext];
-
-  // Read and upload file
-  const imageBuffer = await readFile(sanitizedPath);
-  return await client.v1.uploadMedia(imageBuffer, { mimeType });
-}
-
-// Helper function to upload video with chunked upload
-async function uploadVideo(client: TwitterApi, videoPath: string): Promise<string> {
-  // Sanitize path to prevent directory traversal
-  const sanitizedPath = resolve(videoPath);
-
-  // Validate file exists and get stats
-  let fileStats;
-  try {
-    fileStats = await stat(sanitizedPath);
-  } catch (error) {
-    throw new Error(`File not found: ${basename(sanitizedPath)}`);
-  }
-
-  // Check if it's a file (not a directory)
-  if (!fileStats.isFile()) {
-    throw new Error(`Path is not a file: ${basename(sanitizedPath)}`);
-  }
-
-  // Twitter video size limit is 512MB
-  const MAX_SIZE = 512 * 1024 * 1024; // 512MB in bytes
-  if (fileStats.size > MAX_SIZE) {
-    throw new Error(`Video size exceeds 512MB limit (${(fileStats.size / 1024 / 1024).toFixed(2)}MB)`);
-  }
-
-  // Detect mime type from file extension
-  const ext = sanitizedPath.toLowerCase().split('.').pop();
-  const mimeTypes: { [key: string]: string } = {
-    'mp4': 'video/mp4',
-    'mov': 'video/quicktime',
-    'avi': 'video/x-msvideo',
-    'webm': 'video/webm',
-    'm4v': 'video/x-m4v'
-  };
-
-  // Validate supported format
-  if (!ext || !mimeTypes[ext]) {
-    const supported = Object.keys(mimeTypes).join(', ');
-    throw new Error(`Unsupported video format. Supported formats: ${supported}`);
-  }
-
-  const mimeType = mimeTypes[ext];
-
-  // Read video file
-  const videoBuffer = await readFile(sanitizedPath);
-
-  // Upload video using chunked upload
-  return await client.v1.uploadMedia(videoBuffer, {
-    mimeType,
-    target: 'tweet',
-    additionalOwners: undefined,
-    longVideo: fileStats.size > 15 * 1024 * 1024 // Use long video for files > 15MB
-  });
-}
-
-// Track rate limit reset times
-const rateLimitResets: { [key: string]: number } = {
-  'home': 0,
-  'tweet': 0,
-  'reply': 0,
-  'delete': 0
+const HANDLERS: Readonly<Record<string, ToolHandler>> = {
+  get_home_timeline: handleGetHomeTimeline,
+  search_tweets: handleSearchTweets,
+  get_tweet: handleGetTweet,
+  create_tweet: handleCreateTweet,
+  reply_to_tweet: handleReplyToTweet,
+  quote_tweet: handleQuoteTweet,
+  delete_tweet: handleDeleteTweet,
+  like_tweet: handleLikeTweet,
+  unlike_tweet: handleUnlikeTweet,
+  retweet: handleRetweet,
+  undo_retweet: handleUndoRetweet,
+  bookmark_tweet: handleBookmarkTweet,
+  unbookmark_tweet: handleUnbookmarkTweet,
+  get_bookmarks: handleGetBookmarks,
+  get_user: handleGetUser,
+  get_user_tweets: handleGetUserTweets,
 };
-
-// Helper function for rate limit handling
-async function withRateLimit<T>(endpoint: 'home' | 'tweet' | 'reply' | 'delete', fn: () => Promise<T>): Promise<T> {
-  const now = Date.now();
-  const resetTime = rateLimitResets[endpoint];
-  
-  if (now < resetTime) {
-    const waitTime = resetTime - now + 1000; // Add 1 second buffer
-    await new Promise(resolve => setTimeout(resolve, waitTime));
-  }
-
-  try {
-    const result = await fn();
-    // Set next reset time to 15 minutes from now for free tier
-    rateLimitResets[endpoint] = now + (15 * 60 * 1000);
-    return result;
-  } catch (error: any) {
-    if (error?.code === 429) {
-      // If we get a rate limit error, wait 15 minutes before next attempt
-      rateLimitResets[endpoint] = now + (15 * 60 * 1000);
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `Rate limit exceeded for ${endpoint}. Please try again in 15 minutes.`
-      );
-    }
-    throw error;
-  }
-}
-
-// Twitter API client setup
-const client = new TwitterApi({
-  appKey: process.env.TWITTER_API_KEY ?? '',
-  appSecret: process.env.TWITTER_API_SECRET ?? '',
-  accessToken: process.env.TWITTER_ACCESS_TOKEN ?? '',
-  accessSecret: process.env.TWITTER_ACCESS_SECRET ?? '',
-});
 
 class XMcpServer {
   private server: Server;
 
   constructor() {
     this.server = new Server(
-      {
-        name: 'x-mcp-server',
-        version: '1.0.0',
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
-      }
+      { name: 'x-mcp-server', version: '2.0.0' },
+      { capabilities: { tools: {} } }
     );
 
     this.setupToolHandlers();
-    
-    // Error handling
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
       await this.server.close();
@@ -186,254 +69,24 @@ class XMcpServer {
 
   private setupToolHandlers() {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: [
-        {
-          name: 'get_home_timeline',
-          description: 'Get the most recent tweets from your home timeline',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              limit: {
-                type: 'number',
-                description: 'Number of tweets to retrieve (max 100)',
-                minimum: 1,
-                maximum: 100,
-                default: 20,
-              },
-            },
-          },
-        },
-        {
-          name: 'create_tweet',
-          description: 'Create a new tweet with optional image or video attachment',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              text: {
-                type: 'string',
-                description: 'The text content of the tweet',
-                maxLength: 280,
-              },
-              image_path: {
-                type: 'string',
-                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF, WEBP)',
-              },
-              video_path: {
-                type: 'string',
-                description: 'Optional absolute path to a video file to attach (MP4, MOV, AVI, WEBM, M4V). Max 512MB. Cannot be used with image_path.',
-              },
-            },
-            required: ['text'],
-          },
-        },
-        {
-          name: 'reply_to_tweet',
-          description: 'Reply to a tweet with optional image or video attachment',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              tweet_id: {
-                type: 'string',
-                description: 'The ID of the tweet to reply to',
-              },
-              text: {
-                type: 'string',
-                description: 'The text content of the reply',
-                maxLength: 280,
-              },
-              image_path: {
-                type: 'string',
-                description: 'Optional absolute path to an image file to attach (PNG, JPEG, GIF, WEBP)',
-              },
-              video_path: {
-                type: 'string',
-                description: 'Optional absolute path to a video file to attach (MP4, MOV, AVI, WEBM, M4V). Max 512MB. Cannot be used with image_path.',
-              },
-            },
-            required: ['tweet_id', 'text'],
-          },
-        },
-        {
-          name: 'delete_tweet',
-          description: 'Delete one of your tweets',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              tweet_id: {
-                type: 'string',
-                description: 'The ID of the tweet to delete',
-              },
-            },
-            required: ['tweet_id'],
-          },
-        },
-      ],
+      tools: TOOL_DEFINITIONS,
     }));
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      const handler = HANDLERS[name];
+
+      if (!handler) {
+        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+      }
+
       try {
-        switch (request.params.name) {
-          case 'get_home_timeline': {
-            const { limit = 20 } = request.params.arguments as { limit?: number };
-            
-            const timeline = await withRateLimit('home', () => client.v2.homeTimeline({
-              max_results: Math.min(limit, 5), // Limit to max 5 tweets for free tier
-              'tweet.fields': ['author_id', 'created_at', 'referenced_tweets'],
-              expansions: ['author_id', 'referenced_tweets.id'],
-            }));
-            
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(timeline.data, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'create_tweet': {
-            const { text, image_path, video_path } = request.params.arguments as {
-              text: string;
-              image_path?: string;
-              video_path?: string;
-            };
-
-            // Validate that both image and video aren't provided
-            if (image_path && video_path) {
-              throw new McpError(
-                ErrorCode.InvalidRequest,
-                'Cannot attach both image and video to the same tweet. Please provide only one.'
-              );
-            }
-
-            let mediaId: string | undefined;
-
-            // Upload media if image_path is provided
-            if (image_path) {
-              try {
-                mediaId = await uploadImage(client, image_path);
-              } catch (error) {
-                throw new McpError(
-                  ErrorCode.InvalidRequest,
-                  `Failed to upload image: ${(error as Error).message}`
-                );
-              }
-            }
-
-            // Upload video if video_path is provided
-            if (video_path) {
-              try {
-                mediaId = await uploadVideo(client, video_path);
-              } catch (error) {
-                throw new McpError(
-                  ErrorCode.InvalidRequest,
-                  `Failed to upload video: ${(error as Error).message}`
-                );
-              }
-            }
-
-            const tweet = await withRateLimit('tweet', () =>
-              mediaId
-                ? client.v2.tweet({ text, media: { media_ids: [mediaId] } })
-                : client.v2.tweet(text)
-            );
-
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(tweet.data, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'reply_to_tweet': {
-            const { tweet_id, text, image_path, video_path } = request.params.arguments as {
-              tweet_id: string;
-              text: string;
-              image_path?: string;
-              video_path?: string;
-            };
-
-            // Validate that both image and video aren't provided
-            if (image_path && video_path) {
-              throw new McpError(
-                ErrorCode.InvalidRequest,
-                'Cannot attach both image and video to the same reply. Please provide only one.'
-              );
-            }
-
-            let mediaId: string | undefined;
-
-            // Upload media if image_path is provided
-            if (image_path) {
-              try {
-                mediaId = await uploadImage(client, image_path);
-              } catch (error) {
-                throw new McpError(
-                  ErrorCode.InvalidRequest,
-                  `Failed to upload image: ${(error as Error).message}`
-                );
-              }
-            }
-
-            // Upload video if video_path is provided
-            if (video_path) {
-              try {
-                mediaId = await uploadVideo(client, video_path);
-              } catch (error) {
-                throw new McpError(
-                  ErrorCode.InvalidRequest,
-                  `Failed to upload video: ${(error as Error).message}`
-                );
-              }
-            }
-
-            const reply = await withRateLimit('reply', () =>
-              mediaId
-                ? client.v2.tweet({ text, reply: { in_reply_to_tweet_id: tweet_id }, media: { media_ids: [mediaId] } })
-                : client.v2.reply(text, tweet_id)
-            );
-
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(reply.data, null, 2),
-                },
-              ],
-            };
-          }
-
-          case 'delete_tweet': {
-            const { tweet_id } = request.params.arguments as { tweet_id: string };
-            const deleted = await withRateLimit('delete', () => client.v2.deleteTweet(tweet_id));
-            
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(deleted.data, null, 2),
-                },
-              ],
-            };
-          }
-
-          default:
-            throw new McpError(
-              ErrorCode.MethodNotFound,
-              `Unknown tool: ${request.params.name}`
-            );
-        }
+        return await handler((args ?? {}) as Record<string, unknown>);
       } catch (error) {
-        if (error instanceof McpError) {
-          throw error;
-        }
+        if (error instanceof McpError) throw error;
         throw new McpError(
           ErrorCode.InternalError,
-          `Twitter API error: ${(error as Error).message}`
+          `X API error: ${(error as Error).message}`
         );
       }
     });
@@ -442,7 +95,7 @@ class XMcpServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('X MCP server running on stdio');
+    console.error('X MCP server v2.0.0 running on stdio');
   }
 }
 
