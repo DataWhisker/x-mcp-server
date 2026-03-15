@@ -1,24 +1,29 @@
 {
   "name": "x-mcp-server",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "main": "build/index.js",
   "bin": {
     "x-mcp-server": "./build/index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "scripts": {
     "build": "tsc",
     "start": "node build/index.js",
     "dev": "tsc -w"
   },
-  "keywords": ["mcp", "twitter", "x"],
+  "keywords": ["mcp", "twitter", "x", "api-v2"],
   "author": "",
-  "license": "ISC",
-  "description": "MCP server for X (Twitter) integration",
+  "license": "MIT",
+  "description": "MCP server for X (Twitter) integration — v2 API with OAuth 2.0 media upload",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "twitter-api-v2": "^1.15.0"
+  },
+  "devDependencies": {
     "@types/node": "^20.0.0",
-    "twitter-api-v2": "^1.15.0",
     "typescript": "^5.0.0"
   }
 }
