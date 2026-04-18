@@ -273,4 +273,18 @@ export const TOOL_DEFINITIONS: Tool[] = [
       required: ['username'],
     },
   },
+  {
+    name: 'get_article',
+    description: 'Fetch the full body content of an X Article post by its tweet ID',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        tweet_id: {
+          type: 'string',
+          description: 'The ID of the X Article post',
+        },
+      },
+      required: ['tweet_id'],
+    },
+  },
 ];

@@ -25,6 +25,7 @@ import {
   handleGetBookmarks,
   handleGetUser,
   handleGetUserTweets,
+  handleGetArticle,
 } from './tools/handlers.js';
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<{
@@ -48,6 +49,7 @@ const HANDLERS: Readonly<Record<string, ToolHandler>> = {
   get_bookmarks: handleGetBookmarks,
   get_user: handleGetUser,
   get_user_tweets: handleGetUserTweets,
+  get_article: handleGetArticle,
 };
 
 class XMcpServer {
