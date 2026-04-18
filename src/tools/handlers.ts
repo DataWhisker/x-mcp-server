@@ -147,7 +147,7 @@ export async function handleGetTweet(
         'public_metrics',
         'referenced_tweets',
         'conversation_id',
-      ],
+              ],
       expansions: ['author_id', 'referenced_tweets.id'],
       'user.fields': ['name', 'username'],
     })
@@ -376,3 +376,23 @@ export async function handleGetUserTweets(
 
   return jsonResult(tweets.data);
 }
+
+// --- Articles ---
+
+export async function handleGetArticle(
+  args: Record<string, unknown>
+): Promise<HandlerResult> {
+  const tweetId = requireTweetId(args, 'tweet_id');
+  const client = await getClient();
+
+  const result = await withRateLimit('get_article', () =>
+    client.v2.singleTweet(tweetId, {
+      'tweet.fields': ['author_id', 'created_at', 'text', 'article'],
+      expansions: ['attachments.media_keys'],
+    })
+  );
+
+  return jsonResult(result.data);
+}
+
+
