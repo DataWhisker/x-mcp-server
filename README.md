@@ -1,19 +1,20 @@
 # X MCP Server
 
-A Model Context Protocol (MCP) server for X (Twitter) integration. Provides 16 tools for reading timelines, posting, searching, engagement (likes, retweets, bookmarks), and user lookup. Designed for use with Claude desktop and other MCP-compatible clients.
+A Model Context Protocol (MCP) server for X (Twitter) integration. Provides 26 tools for reading timelines, posting, searching, engagement (likes, retweets, bookmarks), user lookup, follower export, mentions, likes, articles, and lists. Designed for use with Claude desktop and other MCP-compatible clients.
 
 <a href="https://glama.ai/mcp/servers/5nx3qqiunw"><img width="380" height="200" src="https://glama.ai/mcp/servers/5nx3qqiunw/badge" alt="X Server MCP server" /></a>
 
 ## Features
 
-- **Timeline & Search** — Home timeline, search recent posts (7-day window)
-- **Post Management** — Create, reply, quote, delete posts with optional media
-- **Engagement** — Like/unlike, retweet/undo, bookmark/unbookmark
-- **User Lookup** — Get user profiles and their recent posts
-- **Media Upload** — Images (PNG, JPEG, GIF, WEBP) and videos (MP4, MOV, AVI, WEBM, M4V) via v2 upload API
-- **Dual Auth** — OAuth 1.0a for post operations, OAuth 2.0 for media upload (v1.1 upload was sunset June 2025)
-- **Rate Limiting** — Automatic per-endpoint rate limit tracking with clear error messages
-- **TypeScript** — Full type safety, modular file structure
+- **Timeline & Search** - Home timeline, search recent posts (7-day window)
+- **Post Management** - Create, reply, quote, delete posts with optional media
+- **Engagement** - Like/unlike, retweet/undo, bookmark/unbookmark
+- **User Data** - Mentions, liked posts, followers, following, blocks, mutes, owned lists, followed lists, and list memberships
+- **User Lookup** - Get user profiles and their recent posts
+- **Media Upload** - Images (PNG, JPEG, GIF, WEBP) and videos (MP4, MOV, AVI, WEBM, M4V) via v2 upload API
+- **Dual Auth** - OAuth 1.0a for post operations, OAuth 2.0 for media upload (v1.1 upload was sunset June 2025)
+- **Rate Limiting** - Automatic per-endpoint rate limit tracking with clear error messages
+- **TypeScript** - Full type safety, modular file structure
 
 ## Prerequisites
 
@@ -67,13 +68,13 @@ Works for all post/engagement/search/user operations.
 
 The v1.1 media upload endpoint was sunset in June 2025. Media upload now requires OAuth 2.0 via the v2 upload API.
 
-**Option A — Direct access token:**
+**Option A - Direct access token:**
 
 | Variable | Description |
 |----------|-------------|
 | `TWITTER_OAUTH2_ACCESS_TOKEN` | OAuth 2.0 user access token (expires in 2 hours) |
 
-**Option B — Auto-refresh (recommended for long-running servers):**
+**Option B - Auto-refresh (recommended for long-running servers):**
 
 | Variable | Description |
 |----------|-------------|
@@ -87,7 +88,7 @@ Tokens are auto-refreshed and persisted to `~/.x-mcp-tokens.json`.
 1. In your app settings, enable OAuth 2.0
 2. Set type to "Confidential client" or "Public client"
 3. Add a callback URL
-4. Request scopes: `tweet.read`, `tweet.write`, `users.read`, `media.write`, `offline.access`, `like.read`, `like.write`, `bookmark.read`, `bookmark.write`
+4. Request scopes: `tweet.read`, `tweet.write`, `users.read`, `media.write`, `offline.access`, `like.read`, `like.write`, `bookmark.read`, `bookmark.write`, `follows.read`, `block.read`, `mute.read`, `list.read`
 
 ## Claude Desktop Configuration
 
@@ -111,7 +112,7 @@ Add to `%APPDATA%/Claude/claude_desktop_config.json`:
 }
 ```
 
-## Available Tools (16)
+## Available Tools (26)
 
 ### Timeline & Search
 
@@ -148,6 +149,21 @@ Add to `%APPDATA%/Claude/claude_desktop_config.json`:
 |------|-------------|---------------|
 | `get_user` | Look up user by username | `username` |
 | `get_user_tweets` | Get a user's recent posts | `username`, `limit` |
+| `get_user_mentions` | Get posts mentioning a user | `username`, `limit` |
+| `get_user_liked_tweets` | Get a user's liked posts | `username`, `limit` |
+| `get_user_followers` | Get a user's followers | `username`, `limit` |
+| `get_user_following` | Get accounts a user follows | `username`, `limit` |
+| `get_blocking_users` | Get users blocked by the authenticated account | `limit` |
+| `get_muting_users` | Get users muted by the authenticated account | `limit` |
+| `get_owned_lists` | Get lists owned by a user | `username`, `limit` |
+| `get_followed_lists` | Get lists followed by a user | `username`, `limit` |
+| `get_list_memberships` | Get lists a user belongs to | `username`, `limit` |
+
+### Articles
+
+| Tool | Description | Key Parameters |
+|------|-------------|---------------|
+| `get_article` | Fetch the full body content of an X Article post | `tweet_id` |
 
 ## Media Support
 
@@ -161,7 +177,7 @@ Add to `%APPDATA%/Claude/claude_desktop_config.json`:
 
 - **Input validation:** Tweet IDs must be numeric (1-20 digits), usernames must match `[A-Za-z0-9_]{1,15}`
 - **Media path restriction:** Upload paths are validated against an allow-list (home directory, temp directory)
-- **Token storage:** OAuth 2.0 tokens persisted to `~/.x-mcp-tokens.json` with `0o600` permissions (Unix). On Windows, file permissions are not enforced by the OS — protect the file via NTFS ACLs or use environment variables instead.
+- **Token storage:** OAuth 2.0 tokens persisted to `~/.x-mcp-tokens.json` with `0o600` permissions (Unix). On Windows, file permissions are not enforced by the OS - protect the file via NTFS ACLs or use environment variables instead.
 - **Error sanitization:** X API error details are logged server-side only; sanitized messages are returned to MCP clients
 - **Refresh mutex:** Concurrent token refresh attempts are deduplicated to prevent race conditions
 

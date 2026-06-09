@@ -23,10 +23,21 @@ import {
   handleBookmarkTweet,
   handleUnbookmarkTweet,
   handleGetBookmarks,
-  handleGetUser,
-  handleGetUserTweets,
   handleGetArticle,
 } from './tools/handlers.js';
+import {
+  handleGetUser,
+  handleGetUserTweets,
+  handleGetUserMentions,
+  handleGetUserLikedTweets,
+  handleGetUserFollowers,
+  handleGetUserFollowing,
+  handleGetBlockingUsers,
+  handleGetMutingUsers,
+  handleGetOwnedLists,
+  handleGetFollowedLists,
+  handleGetListMemberships,
+} from './tools/user-data-handlers.js';
 
 type ToolHandler = (args: Record<string, unknown>) => Promise<{
   readonly content: ReadonlyArray<{ readonly type: 'text'; readonly text: string }>;
@@ -49,6 +60,15 @@ const HANDLERS: Readonly<Record<string, ToolHandler>> = {
   get_bookmarks: handleGetBookmarks,
   get_user: handleGetUser,
   get_user_tweets: handleGetUserTweets,
+  get_user_mentions: handleGetUserMentions,
+  get_user_liked_tweets: handleGetUserLikedTweets,
+  get_user_followers: handleGetUserFollowers,
+  get_user_following: handleGetUserFollowing,
+  get_blocking_users: handleGetBlockingUsers,
+  get_muting_users: handleGetMutingUsers,
+  get_owned_lists: handleGetOwnedLists,
+  get_followed_lists: handleGetFollowedLists,
+  get_list_memberships: handleGetListMemberships,
   get_article: handleGetArticle,
 };
 
