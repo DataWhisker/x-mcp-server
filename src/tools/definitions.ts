@@ -1,4 +1,5 @@
 import { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { USER_DATA_TOOL_DEFINITIONS } from './user-data-definitions.js';
 
 export const TOOL_DEFINITIONS: Tool[] = [
   // --- Timeline & Search ---
@@ -273,6 +274,7 @@ export const TOOL_DEFINITIONS: Tool[] = [
       required: ['username'],
     },
   },
+  ...USER_DATA_TOOL_DEFINITIONS,
   {
     name: 'get_article',
     description: 'Fetch the full body content of an X Article post by its tweet ID',

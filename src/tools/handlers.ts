@@ -1,4 +1,5 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import type { TweetV2 } from 'twitter-api-v2';
 import { getClient, getAuthenticatedUserId } from '../client.js';
 import { uploadMedia } from '../media.js';
 import { withRateLimit } from '../rate-limit.js';
@@ -14,7 +15,11 @@ function jsonResult(data: unknown): HandlerResult {
 }
 
 const TWEET_ID_RE = /^\d{1,20}$/;
-const USERNAME_RE = /^[A-Za-z0-9_]{1,15}$/;
+const DEFAULT_TWEET_FIELDS: Array<keyof TweetV2> = [
+  'author_id',
+  'created_at',
+  'public_metrics',
+];
 
 function requireString(args: Record<string, unknown>, field: string): string {
   const value = args[field];
@@ -31,14 +36,6 @@ function requireTweetId(args: Record<string, unknown>, field: string): string {
   const value = requireString(args, field);
   if (!TWEET_ID_RE.test(value)) {
     throw new McpError(ErrorCode.InvalidRequest, `Invalid tweet ID format for '${field}'`);
-  }
-  return value;
-}
-
-function requireUsername(args: Record<string, unknown>, field: string): string {
-  const value = requireString(args, field);
-  if (!USERNAME_RE.test(value)) {
-    throw new McpError(ErrorCode.InvalidRequest, `Invalid username format for '${field}'`);
   }
   return value;
 }
@@ -65,6 +62,11 @@ function optionalNumber(args: Record<string, unknown>, field: string, fallback: 
     );
   }
   return value;
+}
+
+function normalizedLimit(args: Record<string, unknown>, fallback: number): number {
+  const limit = optionalNumber(args, 'limit', fallback);
+  return Math.max(1, Math.min(limit, 100));
 }
 
 async function resolveMediaId(
@@ -97,12 +99,12 @@ async function resolveMediaId(
 export async function handleGetHomeTimeline(
   args: Record<string, unknown>
 ): Promise<HandlerResult> {
-  const limit = optionalNumber(args, 'limit', 20);
+  const limit = normalizedLimit(args, 20);
   const client = await getClient();
 
   const timeline = await withRateLimit('home_timeline', () =>
     client.v2.homeTimeline({
-      max_results: Math.max(1, Math.min(limit, 100)),
+      max_results: limit,
       'tweet.fields': ['author_id', 'created_at', 'public_metrics', 'referenced_tweets'],
       expansions: ['author_id', 'referenced_tweets.id'],
       'user.fields': ['name', 'username'],
@@ -116,13 +118,13 @@ export async function handleSearchTweets(
   args: Record<string, unknown>
 ): Promise<HandlerResult> {
   const query = requireString(args, 'query');
-  const limit = optionalNumber(args, 'limit', 10);
+  const limit = normalizedLimit(args, 10);
   const client = await getClient();
 
   const results = await withRateLimit('search', () =>
     client.v2.search(query, {
-      max_results: Math.max(1, Math.min(limit, 100)),
-      'tweet.fields': ['author_id', 'created_at', 'public_metrics'],
+      max_results: limit,
+      'tweet.fields': DEFAULT_TWEET_FIELDS,
       expansions: ['author_id'],
       'user.fields': ['name', 'username'],
     })
@@ -313,68 +315,19 @@ export async function handleUnbookmarkTweet(
 export async function handleGetBookmarks(
   args: Record<string, unknown>
 ): Promise<HandlerResult> {
-  const limit = optionalNumber(args, 'limit', 20);
+  const limit = normalizedLimit(args, 20);
   const client = await getClient();
 
   const bookmarks = await withRateLimit('get_bookmarks', () =>
     client.v2.bookmarks({
-      max_results: Math.max(1, Math.min(limit, 100)),
-      'tweet.fields': ['author_id', 'created_at', 'public_metrics'],
+      max_results: limit,
+      'tweet.fields': DEFAULT_TWEET_FIELDS,
       expansions: ['author_id'],
       'user.fields': ['name', 'username'],
     })
   );
 
   return jsonResult(bookmarks.data);
-}
-
-// --- Users ---
-
-export async function handleGetUser(
-  args: Record<string, unknown>
-): Promise<HandlerResult> {
-  const username = requireUsername(args, 'username');
-  const client = await getClient();
-
-  const user = await withRateLimit('get_user', () =>
-    client.v2.userByUsername(username, {
-      'user.fields': [
-        'description',
-        'public_metrics',
-        'created_at',
-        'location',
-        'url',
-        'verified',
-      ],
-    })
-  );
-
-  return jsonResult(user.data);
-}
-
-export async function handleGetUserTweets(
-  args: Record<string, unknown>
-): Promise<HandlerResult> {
-  const username = requireUsername(args, 'username');
-  const limit = optionalNumber(args, 'limit', 10);
-  const client = await getClient();
-
-  const user = await withRateLimit('get_user', () =>
-    client.v2.userByUsername(username)
-  );
-
-  if (!user.data) {
-    throw new McpError(ErrorCode.InvalidRequest, `User @${username} not found`);
-  }
-
-  const tweets = await withRateLimit('user_tweets', () =>
-    client.v2.userTimeline(user.data.id, {
-      max_results: Math.max(1, Math.min(limit, 100)),
-      'tweet.fields': ['created_at', 'public_metrics', 'referenced_tweets'],
-    })
-  );
-
-  return jsonResult(tweets.data);
 }
 
 // --- Articles ---
@@ -394,5 +347,3 @@ export async function handleGetArticle(
 
   return jsonResult(result.data);
 }
-
-
