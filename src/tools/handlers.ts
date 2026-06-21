@@ -3,6 +3,7 @@ import type { TweetV2 } from 'twitter-api-v2';
 import { getClient, getAuthenticatedUserId } from '../client.js';
 import { uploadMedia } from '../media.js';
 import { withRateLimit } from '../rate-limit.js';
+import { searchTweetsWithXquik, useXquikSearchBackend } from '../xquik.js';
 
 type HandlerResult = {
   readonly content: ReadonlyArray<{ readonly type: 'text'; readonly text: string }>;
@@ -119,6 +120,11 @@ export async function handleSearchTweets(
 ): Promise<HandlerResult> {
   const query = requireString(args, 'query');
   const limit = normalizedLimit(args, 10);
+
+  if (useXquikSearchBackend()) {
+    return jsonResult(await searchTweetsWithXquik(query, limit));
+  }
+
   const client = await getClient();
 
   const results = await withRateLimit('search', () =>
