@@ -112,6 +112,17 @@ Add to `%APPDATA%/Claude/claude_desktop_config.json`:
 }
 ```
 
+### Optional Xquik Search Backend
+
+`search_tweets` can use Xquik while the rest of the server keeps the default
+X API client. Set:
+
+| Variable | Description |
+|----------|-------------|
+| `X_MCP_SEARCH_BACKEND=xquik` | Routes only `search_tweets` to Xquik |
+| `XQUIK_API_KEY` | Xquik API key |
+| `XQUIK_API_BASE_URL` | Optional base URL, defaults to `https://xquik.com/api/v1` |
+
 ## Available Tools (26)
 
 ### Timeline & Search
